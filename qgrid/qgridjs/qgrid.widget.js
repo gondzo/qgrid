@@ -24,39 +24,41 @@ define([path], function(widget) {
                     "<link id='dg-css' href='" + cdn_base_url + "/qgrid.css' rel='stylesheet'>"
                 ]);
             }
-
-            var path_dictionary = {
-                jquery_drag: cdn_base_url + "/lib/jquery.event.drag-2.2",
-                slick_core: cdn_base_url + "/lib/slick.core.2.2",
-                slick_data_view: cdn_base_url + "/lib/slick.dataview.2.2",
-                slick_check_box_column: cdn_base_url + "/lib/slick.checkboxselectcolumn",
-                slick_row_selection_model: cdn_base_url + "/lib/slick.rowselectionmodel",
-                slick_grid: cdn_base_url + "/lib/slick.grid.2.2",
-                data_grid: cdn_base_url + "/qgrid",
-                date_filter: cdn_base_url + "/qgrid.datefilter",
-                text_filter: cdn_base_url + "/qgrid.textfilter",
-                slider_filter: cdn_base_url + "/qgrid.sliderfilter",
-                filter_base:  cdn_base_url + "/qgrid.filterbase",
-                editors: cdn_base_url + "/qgrid.editors",
-                handlebars: "https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0/handlebars.min"
-            };
-
             var existing_config = require.s.contexts._.config;
-            if (!existing_config.paths['underscore']){
-                path_dictionary['underscore'] = "https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min";
-            }
+            if (!existing_config.paths.data_grid){
+                var path_dictionary = {
+                    jquery_drag: cdn_base_url + "/lib/jquery.event.drag-2.2",
+                    slick_core: cdn_base_url + "/lib/slick.core.2.2",
+                    slick_data_view: cdn_base_url + "/lib/slick.dataview.2.2",
+                    slick_check_box_column: cdn_base_url + "/lib/slick.checkboxselectcolumn",
+                    slick_row_selection_model: cdn_base_url + "/lib/slick.rowselectionmodel",
+                    slick_grid: cdn_base_url + "/lib/slick.grid.2.2",
+                    data_grid: cdn_base_url + "/qgrid",
+                    date_filter: cdn_base_url + "/qgrid.datefilter",
+                    text_filter: cdn_base_url + "/qgrid.textfilter",
+                    slider_filter: cdn_base_url + "/qgrid.sliderfilter",
+                    filter_base:  cdn_base_url + "/qgrid.filterbase",
+                    editors: cdn_base_url + "/qgrid.editors",
+                    handlebars: "https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0/handlebars.min"
+                };
 
-            if (!existing_config.paths['moment']){
-                path_dictionary['moment'] = "https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.8.3/moment.min";
-            }
+                
+                if (!existing_config.paths['underscore']){
+                    path_dictionary['underscore'] = "https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min";
+                }
 
-            if (!existing_config.paths['jqueryui']){
-                path_dictionary['jqueryui'] = "https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min";
-            }
+                if (!existing_config.paths['moment']){
+                    path_dictionary['moment'] = "https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.8.3/moment.min";
+                }
 
-            require.config({
-                paths: path_dictionary
-            });
+                if (!existing_config.paths['jqueryui']){
+                    path_dictionary['jqueryui'] = "https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min";
+                }
+
+                window.require.config({
+                    paths:path_dictionary
+                });
+            }
 
             if (typeof jQuery === 'function') {
                 define('jquery', function() { return jQuery; });
@@ -119,6 +121,33 @@ define([path], function(widget) {
             var df = JSON.parse(this.model.get('_df_json'));
             var column_types = JSON.parse(this.model.get('_column_types_json'));
             var options = this.model.get('grid_options');
+
+            var addStatusColumn = this.model.get('statusColumn');
+            var addStatusRow = this.model.get('statusRow');
+            var columnStatusColors=this.model.get('columnStatusColors');
+            var rowStatusColors=this.model.get('rowStatusColors');
+            var columnStatusEvalString = this.model.get('columnStatusCallback');
+            var rowStatusEvalString = this.model.get('rowStatusCallback');
+            
+            if (addStatusRow){
+                var css = "<style scoped>";
+                $(rowStatusColors).each(function(i,v){
+                    css+=".q-grid .slick-cell.rowStatus"+i+"{border-right-color:"+v+" !important; border-right-width:5px !important;border-right-style:solid !important}\n";
+                });
+                css+="</style>";
+                that.$el.parent().prepend($(css));
+            }
+            if (addStatusColumn){
+                var css = "<style scoped>";
+                $(columnStatusColors).each(function(i,v){
+                    css+=".q-grid .slick-cell.columnStatus"+i+"{padding-bottom:0px;border-bottom-color:"+v+" !important; border-bottom-width:5px !important;border-bottom-style:solid !important}\n";
+                });
+                css+="</style>";
+                that.$el.parent().prepend($(css));
+            }
+
+            
+
             grid = new this.dgrid.QGrid(this.tableDiv, df, column_types);
             grid.initialize_slick_grid(options);
 
@@ -161,6 +190,31 @@ define([path], function(widget) {
                 var msg = {'rows': rows, 'type': 'selection_change'};
                 that.send(msg);
             });
+
+            var cellStyles = {};
+            if (addStatusColumn){
+                $(df).each(function(i,row){
+                    var ret = new Function('row',rowStatusEvalString)(row);
+                    cellStyles[i] = {};
+                    cellStyles[i][columns[columns.length-1].name] = "rowStatus"+ret;
+                });
+            }
+
+            if (addStatusRow){
+                $(columns).each(function(i,v){
+                    var values = [];
+                    $(df).each(function(ii,vv){
+                        values.push(vv[v.name]);
+                    });
+                    var ret = new Function('values',columnStatusEvalString)(values);
+                    
+                    if (!cellStyles[df.length-1])
+                        cellStyles[df.length-1] = {};
+                    cellStyles[df.length-1][v.name] = "columnStatus"+ret;
+                });
+            }
+            
+            sgrid.setCellCssStyles("nice",cellStyles);
         },
 
         /**
@@ -216,3 +270,4 @@ define([path], function(widget) {
 
     return {QGridView: QGridView}
 });
+

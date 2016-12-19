@@ -53,11 +53,18 @@ class _DefaultSettings(object):
         self._show_toolbar = False
         self._remote_js = False
         self._precision = None  # Defer to pandas.get_option
+        self._statusRow = False
+        self._statusColumn = False
+        self._rowStatusColors = ["red"]
+        self._columnStatusColors = ["red"]
+        self._rowStatusCallback = "return 0;"
+        self._columnStatusCallback = "return 0;"
 
     def set_grid_option(self, optname, optvalue):
         self._grid_options[optname] = optvalue
 
-    def set_defaults(self, show_toolbar=None, remote_js=None, precision=None, grid_options=None):
+    def set_defaults(self, show_toolbar=None, remote_js=None, precision=None, grid_options=None,
+        statusRow=None,statusColumn=None,rowStatusColors=None,columnStatusColors=None,rowStatusCallback=None,columnStatusCallback=None):
         if show_toolbar is not None:
             self._show_toolbar = show_toolbar
         if remote_js is not None:
@@ -66,6 +73,18 @@ class _DefaultSettings(object):
             self._precision = precision
         if grid_options is not None:
             self._grid_options = grid_options
+        if statusRow is not None:
+            self._statusRow = statusRow
+        if statusColumn is not None:
+            self._statusColumn = statusColumn
+        if rowStatusColors is not None:
+            self._rowStatusColors = rowStatusColors
+        if columnStatusColors is not None:
+            self._columnStatusColors = columnStatusColors
+        if rowStatusCallback is not None:
+            self._rowStatusCallback = rowStatusCallback
+        if columnStatusCallback is not None:
+            self._columnStatusCallback = columnStatusCallback
 
     @property
     def show_toolbar(self):
@@ -83,10 +102,34 @@ class _DefaultSettings(object):
     def precision(self):
         return self._precision or pd.get_option('display.precision') - 1
 
+    @property
+    def statusRow(self):
+        return self._statusRow
+
+    @property
+    def statusColumn(self):
+        return self._statusColumn
+
+    @property
+    def rowStatusColors(self):
+        return self._rowStatusColors
+
+    @property
+    def columnStatusColors(self):
+        return self._columnStatusColors
+
+    @property
+    def rowStatusCallback(self):
+        return self._rowStatusCallback
+
+    @property
+    def columnStatusCallback(self):
+        return self._columnStatusCallback
 defaults = _DefaultSettings()
 
 
-def set_defaults(show_toolbar=None, remote_js=None, precision=None, grid_options=None):
+def set_defaults(show_toolbar=None, remote_js=None, precision=None, grid_options=None,
+    statusRow=None,statusColumn=None,rowStatusColors=None,columnStatusColors=None,rowStatusCallback=None,columnStatusCallback=None):
     """
     Set the default qgrid options.  The options that you can set here are the
     same ones that you can pass into ``show_grid``.  See the documentation
@@ -131,7 +174,8 @@ def set_grid_option(optname, optvalue):
     defaults.grid_options[optname] = optvalue
 
 
-def show_grid(data_frame, show_toolbar=None, remote_js=None, precision=None, grid_options=None):
+def show_grid(data_frame, show_toolbar=None, remote_js=None, precision=None, grid_options=None,
+    statusRow=None,statusColumn=None,rowStatusColors=None,columnStatusColors=None,rowStatusCallback=None,columnStatusCallback=None):
     """
     Main entry point for rendering DataFrames as SlickGrids.
 
@@ -196,6 +240,18 @@ def show_grid(data_frame, show_toolbar=None, remote_js=None, precision=None, gri
         options = defaults.grid_options.copy()
         options.update(grid_options)
         grid_options = options
+    if statusRow is None:
+        self.statusRow = defaults.statusRow
+    if statusColumn is None:
+        statusColumn = defaults.statusColumn
+    if rowStatusColors is None:
+        rowStatusColors = defaults.rowStatusColors
+    if columnStatusColors is None:
+        columnStatusColors = defaults.columnStatusColors
+    if rowStatusCallback is None:
+        rowStatusCallback = defaults.rowStatusCallback
+    if columnStatusCallback is None:
+        columnStatusCallback = defaults.columnStatusCallback
     if not isinstance(grid_options, dict):
         raise TypeError(
             "grid_options must be dict, not %s" % type(grid_options)
@@ -237,6 +293,12 @@ class QGridWidget(widgets.DOMWidget):
     precision = Integer(6)
     grid_options = Dict(sync=True)
     remote_js = Bool(False)
+    statusRow = Bool(False, sync=True)
+    statusColumn = Bool(False, sync=True)
+    rowStatusColors = List( sync=True)
+    columnStatusColors = List( sync=True)
+    rowStatusCallback = Unicode('', sync=True)
+    columnStatusCallback = Unicode('', sync=True)
 
     def __init__(self, *args, **kwargs):
         """Initialize all variables before building the table."""
@@ -258,11 +320,35 @@ class QGridWidget(widgets.DOMWidget):
     def _precision_default(self):
         return defaults.precision
 
+    def _statusRow_default(self):
+        return defaults.statusRow
+
+    def _statusColumn_default(self):
+        return defaults.statusColumn
+
+    def _rowStatusColors_default(self):
+        return defaults.rowStatusColors
+
+    def _columnStatusColors_default(self):
+        return defaults.columnStatusColors
+
+    def _rowStatusCallback_default(self):
+        return defaults.rowStatusCallback
+
+    def _columnStatusCallback_default(self):
+        return defaults.columnStatusCallback
+
     def _df_changed(self):
         """Build the Data Table for the DataFrame."""
         if not self._initialized:
             return
         self._update_table()
+        self.send({'type': 'draw_table'})
+
+    def redraw(self):
+        """Redraw the Data Table."""
+        if not self._initialized:
+            return
         self.send({'type': 'draw_table'})
 
     def _update_table(self):
