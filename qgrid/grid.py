@@ -299,6 +299,8 @@ class QGridWidget(widgets.DOMWidget):
     columnStatusColors = List( sync=True)
     rowStatusCallback = Unicode('', sync=True)
     columnStatusCallback = Unicode('', sync=True)
+    dataChangedEventName=Unicode('',sync=True)
+    setDataRowEventName=Unicode('',sync=True)
 
     def __init__(self, *args, **kwargs):
         """Initialize all variables before building the table."""
@@ -343,7 +345,7 @@ class QGridWidget(widgets.DOMWidget):
         if not self._initialized:
             return
         self._update_table()
-        self.send({'type': 'draw_table'})
+        self.send({'type': 'redraw_table'})
 
     def redraw(self):
         """Redraw the Data Table."""

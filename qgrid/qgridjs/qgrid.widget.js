@@ -108,6 +108,13 @@ define([path], function(widget) {
             }
             var width = (parent.clientWidth - parent.childNodes[0].clientWidth);
             this.el.setAttribute("style", "max-width:" + String(width) + "px;");
+
+            this.df = JSON.parse(this.model.get('_df_json'));
+        },
+
+        redraw: function(){
+            this.df = JSON.parse(this.model.get('_df_json'));  
+            this.drawTable();
         },
 
         /**
@@ -118,7 +125,7 @@ define([path], function(widget) {
             var editors = this.editors;
 
             // create the table
-            var df = JSON.parse(this.model.get('_df_json'));
+            var df = this.df
             var column_types = JSON.parse(this.model.get('_column_types_json'));
             var options = this.model.get('grid_options');
 
@@ -128,6 +135,9 @@ define([path], function(widget) {
             var rowStatusColors=this.model.get('rowStatusColors');
             var columnStatusEvalString = this.model.get('columnStatusCallback');
             var rowStatusEvalString = this.model.get('rowStatusCallback');
+
+            var dataChangedEventName = this.model.get('dataChangedEventName');
+            var setDataRowEventName = this.model.get('setDataRowEventName');
             
             if (addStatusRow){
                 var css = "<style scoped>";
@@ -178,6 +188,10 @@ define([path], function(widget) {
                 var msg = {'row': row, 'column': column,
                            'value': args.item[column], 'type': 'cell_change'};
                 that.send(msg);
+
+                if (dataChangedEventName){
+                    $(document).trigger(dataChangedEventName,[args.item]);
+                }
             });
 
             sgrid.onSelectedRowsChanged.subscribe(function(e, args) {
@@ -190,6 +204,37 @@ define([path], function(widget) {
                 var msg = {'rows': rows, 'type': 'selection_change'};
                 that.send(msg);
             });
+
+            if (setDataRowEventName){
+                $(document).on(setDataRowEventName,function(p, filter, item){
+                    for (var i=0;i<grid.slick_grid.getDataLength();i++){
+                        var old = grid.slick_grid.getDataItem(i);
+                        var match=true;
+                        for (var k in filter){
+                            if (old[k]!=filter[k]){
+                                match=false;
+                                break;
+                            }
+                        }    
+                        if (match){
+                            for (var k in item){
+                                if (k=="Index" ||
+                                    k=="excluded_by" ||
+                                    k=="include" ||
+                                    k=="slick_grid_id")
+                                    return;
+                                old[k] = item[k]
+                                var msg = {'row': i, 'column': k,
+                                           'value': item[k], 'type': 'cell_change'};
+                                that.send(msg);
+                            }
+                            grid.slick_grid.updateRow(i);
+                        }
+                    }
+                    
+                    
+                });
+            }
 
             var cellStyles = {};
             if (addStatusColumn){
@@ -244,6 +289,9 @@ define([path], function(widget) {
 
             } else if (msg.type === 'draw_table') {
                 this.drawTable();
+                this.updateSize();
+            } else if (msg.type === 'redraw_table') {
+                this.redraw();
                 this.updateSize();
             }
         },
